@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HEARTZZY — Global Movie Discovery & Recommendation Platform</title>
+  <meta name="description" content="Discover, search, and compare over 600,000+ movies worldwide across all languages, genres, box office collections, awards, and OTT streaming platforms.">
+  <meta name="keywords" content="movies, cinema, tmdb, imdb ratings, box office, ott streaming, movie recommendations, cinematch, heartzzy">
+  <meta name="theme-color" content="#E11D48">
+
+  <!-- Open Graph Meta Tags -->
+  <meta property="og:title" content="HEARTZZY — Global Cinema Discovery">
+  <meta property="og:description" content="Curated discovery, interactive genre breakdown charts, OTT streaming guide, and side-by-side movie comparison.">
+  <meta property="og:type" content="website">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Google Firebase App, Auth & Firestore Compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Chart.js for Genre Composition Visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-logo">
+          <div class="brand-icon">
+            <i data-lucide="film"></i>
+          </div>
+          <div class="brand-text">
+            <h1>HEARTZZY</h1>
+            <span>Cinema Discovery</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- Main Navigation -->
+        <div>
+          <div class="sidebar-section-title">Discovery</div>
+          <ul class="nav-list">
+            <li class="nav-item active" data-nav="all">
+              <button type="button">
+                <span class="nav-left">
+                  <i data-lucide="compass"></i>
+                  <span>Discover All</span>
+                </span>
+              </button>
+            </li>
+            <li class="nav-item" data-nav="trending">
+              <button type="button">
+                <span class="nav-left">
+                  <i data-lucide="trending-up"></i>
+                  <span>Trending Now</span>
+                </span>
+                <span class="nav-badge" id="trendingCountBadge">Hot</span>
+              </button>
+            </li>
+            <li class="nav-item" data-nav="top_rated">
+              <button type="button">
+                <span class="nav-left">
+                  <i data-lucide="star"></i>
+                  <span>Highest Rated</span>
+                </span>
+              </button>
+            </li>
+            <li class="nav-item" data-nav="upcoming">
+              <button type="button">
+                <span class="nav-left">
+                  <i data-lucide="calendar"></i>
+                  <span>Upcoming</span>
+                </span>
+              </button>
+            </li>
+            <li class="nav-item" data-nav="watchlist">
+              <button type="button">
+                <span class="nav-left">
+                  <i data-lucide="bookmark"></i>
+                  <span>My Watchlist</span>
+                </span>
+                <span class="nav-badge" id="watchlistCountBadge">0</span>
+              </button>
+            </li>
+            <li class="nav-item" id="sidebarAdminItem" style="display: none;">
+              <a href="admin.html" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: var(--radius-sm); color: #7C3AED; font-weight: 600; font-size: 0.92rem;">
+                <span class="nav-left" style="display: flex; align-items: center; gap: 12px;">
+                  <i data-lucide="shield"></i>
+                  <span>Admin Console</span>
+                </span>
+                <span class="nav-badge" style="background-color: #EDE9FE; color: #7C3AED; font-size: 0.72rem;">Admin</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Genres Navigation -->
+        <div>
+          <div class="sidebar-section-title">Popular Genres</div>
+          <div class="genres-list" id="genresSidebarList">
+            <!-- Rendered dynamically from TMDB_GENRES -->
+          </div>
+          <button type="button" class="toggle-genres-btn" id="toggleGenresBtn">
+            <i data-lucide="chevron-down" id="toggleGenresIcon"></i>
+            <span id="toggleGenresText">Show All Genres</span>
+          </button>
+        </div>
+
+        <!-- Languages Quick Filter -->
+        <div>
+          <div class="sidebar-section-title">Cinema Languages</div>
+          <div class="languages-chip-grid" id="languagesChipGrid">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="api-status-pill" id="apiStatusIndicator" title="Live Catalog Stream Status">
+          <span class="status-dot"></span>
+          <span id="apiStatusText">Live Catalog Active</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="main-wrapper">
+
+      <!-- STICKY TOPBAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation">
+            <i data-lucide="menu"></i>
+          </button>
+
+          <!-- Live Search Bar -->
+          <div class="search-container">
+            <div class="search-input-wrapper">
+              <i data-lucide="search" class="search-icon"></i>
+              <input 
+                type="text" 
+                id="globalSearchInput" 
+                class="search-input" 
+                placeholder="Search 600,000+ movies worldwide by title..." 
+                autocomplete="off"
+              >
+              <button type="button" id="searchClearBtn" class="search-clear-btn" aria-label="Clear search">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+
+            <!-- Instant Autocomplete Preview Dropdown -->
+            <div class="search-dropdown" id="searchDropdown"></div>
+          </div>
+        </div>
+
+        <!-- Topbar Right Actions -->
+        <div class="topbar-actions">
+          <button type="button" class="action-btn btn-cinematch" id="openCinematchBtn">
+            <i data-lucide="sparkles"></i>
+            <span>CineMatch</span>
+          </button>
+
+          <button type="button" class="action-btn btn-compare" id="openComparatorBtn">
+            <i data-lucide="columns"></i>
+            <span>Compare</span>
+            <span class="compare-badge" id="compareCountBadge">0/2</span>
+          </button>
+
+          <button type="button" class="icon-btn" id="themeToggleBtn" aria-label="Toggle Light/Dark Theme" title="Switch Theme">
+            <i data-lucide="moon" id="themeIcon"></i>
+          </button>
+
+          <!-- Admin Console Direct Button (Visible only to authenticated admins) -->
+          <a href="admin.html" class="action-btn" id="topbarAdminBtn" title="Open Admin User & API Dashboard" style="display: none; background-color: #EDE9FE; color: #7C3AED; border: 1px solid rgba(124, 58, 237, 0.2);">
+            <i data-lucide="shield"></i>
+            <span>Admin</span>
+          </a>
+
+          <!-- User Authentication Section (Sign In or User Profile Chip) -->
+          <div class="user-menu-wrapper" id="userMenuWrapper">
+            <!-- Injected by JavaScript -->
+          </div>
+        </div>
+      </header>
+
+      <!-- MAIN STAGE -->
+      <main class="main-stage">
+
+        <!-- CineMatch Banner -->
+        <div class="cinematch-hero-banner">
+          <div class="banner-content">
+            <div class="banner-badge">
+              <i data-lucide="sparkles"></i>
+            </div>
+            <div class="banner-text">
+              <h2>Can't decide what to watch tonight?</h2>
+              <p>Answer 4 quick questions (time, mood, companion) for instant tailored recommendations with match scores.</p>
+            </div>
+          </div>
+          <button type="button" class="banner-cta" id="bannerCinematchCta">
+            Launch CineMatch
+          </button>
+        </div>
+
+        <!-- Moctale-Inspired Curated Strips (Shown on Discover All) -->
+        <section class="strip-section" id="trendingStripSection">
+          <div class="strip-header">
+            <div class="strip-title-group">
+              <i data-lucide="flame" style="color: var(--accent-brand);"></i>
+              <h3>Trending Movies This Week</h3>
+              <span class="strip-pill">Worldwide Top 10</span>
+            </div>
+            <div class="strip-controls">
+              <button type="button" class="strip-arrow" id="stripTrendingPrev" aria-label="Scroll left">
+                <i data-lucide="chevron-left"></i>
+              </button>
+              <button type="button" class="strip-arrow" id="stripTrendingNext" aria-label="Scroll right">
+                <i data-lucide="chevron-right"></i>
+              </button>
+            </div>
+          </div>
+          <div class="strip-carousel" id="trendingStripCarousel">
+            <!-- Loaded dynamically -->
+          </div>
+        </section>
+
+        <!-- Strip 2: Highest Rated Worldwide -->
+        <section class="strip-section" id="topRatedStripSection">
+          <div class="strip-header">
+            <div class="strip-title-group">
+              <i data-lucide="award" style="color: var(--accent-gold);"></i>
+              <h3>Highest Rated Worldwide</h3>
+              <span class="strip-pill" style="background-color: var(--accent-gold-light); color: var(--accent-gold);">Critically Acclaimed</span>
+            </div>
+            <div class="strip-controls">
+              <button type="button" class="strip-arrow" id="stripTopPrev" aria-label="Scroll left">
+                <i data-lucide="chevron-left"></i>
+              </button>
+              <button type="button" class="strip-arrow" id="stripTopNext" aria-label="Scroll right">
+                <i data-lucide="chevron-right"></i>
+              </button>
+            </div>
+          </div>
+          <div class="strip-carousel" id="topRatedStripCarousel">
+            <!-- Loaded dynamically -->
+          </div>
+        </section>
+
+        <!-- MAIN DISCOVER CATALOG -->
+        <section class="discover-section" id="discoverSection">
+          <div class="discover-header-row">
+            <div class="discover-title-area">
+              <h2 id="discoverHeading">Discover Movies</h2>
+              <p id="discoverSubtitle">Explore top-rated films, awards winners, and box office blockbusters</p>
+            </div>
+
+            <!-- Multi-Facet Filter Bar -->
+            <div class="filter-bar">
+              <div class="filter-group">
+                <span class="filter-label">Year:</span>
+                <select id="filterYearSelect" class="filter-select">
+                  <option value="all">All Years</option>
+                  <option value="2025">2025 (Upcoming)</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                  <option value="2021">2021</option>
+                  <option value="2020">2020</option>
+                  <option value="2010-2019">2010s</option>
+                  <option value="2000-2009">2000s</option>
+                  <option value="1990-1999">1990s</option>
+                  <option value="1950-1989">Classic (Pre-1990)</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <span class="filter-label">Language:</span>
+                <select id="filterLanguageSelect" class="filter-select">
+                  <option value="all">All Languages</option>
+                  <!-- Populated from data -->
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <span class="filter-label">Sort By:</span>
+                <select id="filterSortSelect" class="filter-select">
+                  <option value="popularity.desc">Popularity</option>
+                  <option value="vote_average.desc">IMDb Rating (High → Low)</option>
+                  <option value="revenue.desc">Lifetime Collection (High → Low)</option>
+                  <option value="primary_release_date.desc">Release Date (Newest)</option>
+                </select>
+              </div>
+
+              <button type="button" class="filter-reset-btn" id="filterResetBtn">
+                <i data-lucide="rotate-ccw"></i>
+                <span>Reset</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Active Filter Pills Indicator -->
+          <div class="active-filters-row" id="activeFiltersRow"></div>
+
+          <!-- 4-COLUMN RESPONSIVE MOVIE GRID -->
+          <div class="movie-grid" id="movieGrid">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="movieGridEmptyState" style="display: none; text-align: center; padding: 60px 20px;">
+            <div style="font-size: 3rem; margin-bottom: 12px; opacity: 0.5;">🎬</div>
+            <h3 style="font-size: 1.3rem; margin-bottom: 8px;">No movies found</h3>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Try adjusting your search query, genre, or active filters.</p>
+            <button type="button" class="btn-load-more" id="emptyStateResetBtn" style="margin: 0 auto;">Reset All Filters</button>
+          </div>
+
+          <!-- Pagination / Load More -->
+          <div class="pagination-area" id="paginationArea">
+            <button type="button" class="btn-load-more" id="loadMoreBtn">
+              <i data-lucide="plus-circle"></i>
+              <span>Load More Movies</span>
+            </button>
+          </div>
+
+        </section>
+
+      </main>
+    </div>
+
+  </div>
+
+  <!-- ==========================================================================
+       MODALS & DRAWERS
+       ========================================================================== -->
+
+  <!-- 1. RICH MOVIE DETAIL MODAL -->
+  <div class="modal-overlay" id="movieDetailModal" role="dialog" aria-modal="true">
+    <div class="modal-container">
+      <button type="button" class="modal-close-btn" id="closeDetailModalBtn" aria-label="Close dialog">
+        <i data-lucide="x"></i>
+      </button>
+
+      <!-- Hero Header -->
+      <div class="modal-hero">
+        <img src="" alt="" class="modal-backdrop-img" id="modalBackdrop">
+        <div class="modal-hero-overlay"></div>
+        <div class="modal-hero-content">
+          <img src="" alt="" class="modal-poster" id="modalPoster">
+          <div class="modal-header-info">
+            <h2 class="modal-title" id="modalTitle">Movie Title</h2>
+            <p class="modal-tagline" id="modalTagline">"Catchy movie tagline"</p>
+            <div class="modal-pill-row">
+              <span class="modal-pill" id="modalYear">2024</span>
+              <span class="modal-pill" id="modalRuntime">2h 15m</span>
+              <span class="modal-pill" id="modalLanguage">English</span>
+              <span class="modal-pill" id="modalCertification">UA</span>
+              <span class="modal-live-sync-pill" id="modalLiveSyncPill" style="display: none;">
+                <span class="sync-pulse-dot"></span>
+                <span>Live TMDB Stream</span>
+              </span>
+            </div>
+            <div class="modal-hero-actions">
+              <button type="button" class="btn-modal-action primary" id="modalWatchlistBtn">
+                <i data-lucide="bookmark"></i>
+                <span id="modalWatchlistText">Add to Watchlist</span>
+              </button>
+              <button type="button" class="btn-modal-action" id="modalCompareBtn">
+                <i data-lucide="columns"></i>
+                <span>Add to Compare</span>
+              </button>
+              <button type="button" class="btn-modal-action" id="modalShareBtn">
+                <i data-lucide="share-2"></i>
+                <span>Share</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Body Content -->
+      <div class="modal-body">
+        
+        <!-- Key Metrics Ribbon -->
+        <div class="metrics-ribbon">
+          <div class="metric-item">
+            <span class="metric-label">IMDb Rating</span>
+            <div class="metric-val gold">
+              <i data-lucide="star"></i>
+              <span id="metricRating">8.9</span>
+              <span class="metric-sub" id="metricVotes">(780k votes)</span>
+            </div>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">Lifetime Box Office</span>
+            <div class="metric-val green">
+              <span id="metricRevenue">$975.8M</span>
+            </div>
+            <span class="metric-sub" id="metricRevenueInr">approx. ₹8,120 Cr</span>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">Release Date</span>
+            <div class="metric-val">
+              <span id="metricReleaseDate">2023-07-21</span>
+            </div>
+          </div>
+
+          <div class="metric-item">
+            <span class="metric-label">Genres</span>
+            <div class="card-genres" id="metricGenres">
+              <!-- Genre tags -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Plot Summary & Cast -->
+        <div class="plot-section">
+          <h4>Plot Summary</h4>
+          <p class="plot-text" id="modalPlot">Story synopsis...</p>
+          <div class="plot-crew">
+            <div>
+              <span class="crew-label">Director:</span>
+              <span class="crew-val" id="modalDirector">Director Name</span>
+            </div>
+            <div>
+              <span class="crew-label">Starring:</span>
+              <span class="crew-val" id="modalCast">Cast names</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Awards Breakdown -->
+        <div class="awards-section">
+          <h4>Awards & Global Honors</h4>
+          <div class="awards-card">
+            <div class="awards-header-badge">
+              <div class="award-counter-chip">
+                <i data-lucide="trophy"></i>
+                <span id="awardsWinsCount">348 Wins</span>
+              </div>
+              <div class="award-counter-chip" style="background-color: var(--accent-brand-light); color: var(--accent-brand); border-color: rgba(225,29,72,0.2);">
+                <i data-lucide="award"></i>
+                <span id="awardsNomsCount">382 Nominations</span>
+              </div>
+            </div>
+            <p class="awards-summary-text" id="awardsSummaryText">Full awards recognition text...</p>
+            <div class="major-awards-list" id="majorAwardsList">
+              <!-- Major awards highlights -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Genre Composition % Chart (Chart.js Visualization) -->
+        <div class="chart-section">
+          <h4>Genre Composition DNA</h4>
+          <div class="chart-container-card">
+            <div class="chart-canvas-wrap">
+              <canvas id="genreChartCanvas"></canvas>
+            </div>
+            <div class="genre-progress-list" id="genreProgressList">
+              <!-- Dynamic genre progress bars -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Where to Watch (OTT Streaming Platforms) -->
+        <div class="watch-section">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <h4>Where to Watch</h4>
+            <!-- Region Selector -->
+            <div class="ott-region-tabs">
+              <button type="button" class="region-tab-btn active" data-region="IN">India (IN)</button>
+              <button type="button" class="region-tab-btn" data-region="US">United States (US)</button>
+              <button type="button" class="region-tab-btn" data-region="UK">United Kingdom (UK)</button>
+            </div>
+          </div>
+
+          <div class="ott-tiers-grid" id="ottTiersGrid">
+            <!-- Loaded dynamically based on region -->
+          </div>
+        </div>
+
+        <!-- Community Reviews & Write Review Form -->
+        <div class="reviews-section">
+          <h4>Audience Reviews & Community Score</h4>
+          <div class="reviews-container">
+            <div class="reviews-list" id="modalReviewsList">
+              <!-- Reviews list -->
+            </div>
+
+            <!-- Rate & Write a Review Form -->
+            <form class="review-form-card" id="writeReviewForm">
+              <div class="form-title">Write Your Review</div>
+              
+              <div class="form-input-group">
+                <label class="form-label">Your Rating (1 to 10 Stars):</label>
+                <div class="rating-picker" id="starPicker">
+                  <button type="button" class="star-btn" data-rating="1">1</button>
+                  <button type="button" class="star-btn" data-rating="2">2</button>
+                  <button type="button" class="star-btn" data-rating="3">3</button>
+                  <button type="button" class="star-btn" data-rating="4">4</button>
+                  <button type="button" class="star-btn" data-rating="5">5</button>
+                  <button type="button" class="star-btn" data-rating="6">6</button>
+                  <button type="button" class="star-btn" data-rating="7">7</button>
+                  <button type="button" class="star-btn" data-rating="8">8</button>
+                  <button type="button" class="star-btn active" data-rating="9">9</button>
+                  <button type="button" class="star-btn" data-rating="10">10</button>
+                </div>
+              </div>
+
+              <div class="form-input-group">
+                <label for="reviewAuthorInput" class="form-label">Your Name</label>
+                <input type="text" id="reviewAuthorInput" class="form-input" placeholder="e.g. Cinema Enthusiast" required>
+              </div>
+
+              <div class="form-input-group">
+                <label for="reviewTextInput" class="form-label">Review Highlights</label>
+                <textarea id="reviewTextInput" class="form-textarea" placeholder="Share your thoughts on direction, performances, and emotion..." required></textarea>
+              </div>
+
+              <button type="submit" class="btn-submit-review">Publish Review</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Similar Movies -->
+        <div class="similar-section">
+          <h4>Similar & Recommended Movies</h4>
+          <div class="similar-grid" id="modalSimilarGrid">
+            <!-- Similar movie cards -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. CINEMATCH WIZARD MODAL -->
+  <div class="modal-overlay" id="cinematchModal" role="dialog" aria-modal="true">
+    <div class="modal-container cinematch-modal">
+      <button type="button" class="modal-close-btn" id="closeCinematchBtn" aria-label="Close CineMatch">
+        <i data-lucide="x"></i>
+      </button>
+
+      <div class="modal-body">
+        
+        <!-- Step 1: Time Available -->
+        <div class="cinematch-step active" id="cmStep1">
+          <div class="step-header">
+            <h3>How much time do you have tonight?</h3>
+            <p>Step 1 of 4: Filter by movie runtime pacing</p>
+          </div>
+          <div class="pill-options-grid">
+            <button type="button" class="cinematch-pill-btn" data-time="quick">
+              <span class="pill-title">⚡ Quick Watch (&lt; 105 min)</span>
+              <span class="pill-desc">Breezy, tight comedy or snappy animation</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn selected" data-time="standard">
+              <span class="pill-title">🎬 Standard (~2 Hours)</span>
+              <span class="pill-desc">Classic feature length storytelling</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-time="epic">
+              <span class="pill-title">🌌 Epic (2.5+ Hours)</span>
+              <span class="pill-desc">Immersive world-building and grand sagas</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-time="any">
+              <span class="pill-title">✨ Any Duration</span>
+              <span class="pill-desc">Time is not a constraint tonight</span>
+            </button>
+          </div>
+          <div class="step-nav-row">
+            <div></div>
+            <button type="button" class="btn-step-nav primary" id="cmNext1">Next: Companion &rarr;</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Watching With -->
+        <div class="cinematch-step" id="cmStep2">
+          <div class="step-header">
+            <h3>Who is joining you for movie night?</h3>
+            <p>Step 2 of 4: Target audience and vibe</p>
+          </div>
+          <div class="pill-options-grid">
+            <button type="button" class="cinematch-pill-btn selected" data-companion="solo">
+              <span class="pill-title">🧘 Solo Cinephile</span>
+              <span class="pill-desc">Deep focus, introspective or intense cinema</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-companion="date-night">
+              <span class="pill-title">🕯️ Date Night</span>
+              <span class="pill-desc">Romantic sparks, suspense, or emotional bonds</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-companion="friends">
+              <span class="pill-title">🍿 With Friends</span>
+              <span class="pill-desc">High-octane action, laughter, and popcorn thrillers</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-companion="family">
+              <span class="pill-title">👨‍👩‍👧‍👦 Family Friendly</span>
+              <span class="pill-desc">Universal heartwarming stories for all ages</span>
+            </button>
+          </div>
+          <div class="step-nav-row">
+            <button type="button" class="btn-step-nav" id="cmBack2">&larr; Back</button>
+            <button type="button" class="btn-step-nav primary" id="cmNext2">Next: Mood &rarr;</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Current Mood -->
+        <div class="cinematch-step" id="cmStep3">
+          <div class="step-header">
+            <h3>What emotional mood are you chasing?</h3>
+            <p>Step 3 of 4: Tone and psychological resonance</p>
+          </div>
+          <div class="pill-options-grid">
+            <button type="button" class="cinematch-pill-btn selected" data-mood="mind-bending">
+              <span class="pill-title">🌀 Mind-Bending</span>
+              <span class="pill-desc">Twists, psychological puzzles, multiverse</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-mood="feel-good">
+              <span class="pill-title">☀️ Feel-Good & Warm</span>
+              <span class="pill-desc">Uplifting, optimistic, laughter and tears of joy</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-mood="high-octane">
+              <span class="pill-title">🔥 High-Octane Action</span>
+              <span class="pill-desc">Pulse-racing choreography, explosions, stunts</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-mood="edge-of-seat">
+              <span class="pill-title">⚡ Edge-of-Seat Thriller</span>
+              <span class="pill-desc">Biting suspense, murder mysteries, survival</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-mood="emotional-drama">
+              <span class="pill-title">💔 Emotional Drama</span>
+              <span class="pill-desc">Profound human struggles and master performances</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-mood="hidden-gem">
+              <span class="pill-title">💎 Hidden Gem / Unique</span>
+              <span class="pill-desc">Visually distinct international discoveries</span>
+            </button>
+          </div>
+          <div class="step-nav-row">
+            <button type="button" class="btn-step-nav" id="cmBack3">&larr; Back</button>
+            <button type="button" class="btn-step-nav primary" id="cmNext3">Next: Language &rarr;</button>
+          </div>
+        </div>
+
+        <!-- Step 4: Language Preference -->
+        <div class="cinematch-step" id="cmStep4">
+          <div class="step-header">
+            <h3>Any language preference?</h3>
+            <p>Step 4 of 4: Filter regional or global catalog</p>
+          </div>
+          <div class="pill-options-grid">
+            <button type="button" class="cinematch-pill-btn selected" data-lang="all">
+              <span class="pill-title">🌐 All World Cinema</span>
+              <span class="pill-desc">Best movie regardless of language (with subtitles)</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-lang="en">
+              <span class="pill-title">🇬🇧 English Titles</span>
+              <span class="pill-desc">Hollywood & UK independent releases</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-lang="indian">
+              <span class="pill-title">🇮🇳 Indian Cinema</span>
+              <span class="pill-desc">Hindi, Telugu, Tamil, Malayalam masterpieces</span>
+            </button>
+            <button type="button" class="cinematch-pill-btn" data-lang="international">
+              <span class="pill-title">🌏 International Cinema</span>
+              <span class="pill-desc">Korean, Japanese anime, Spanish, French</span>
+            </button>
+          </div>
+          <div class="step-nav-row">
+            <button type="button" class="btn-step-nav" id="cmBack4">&larr; Back</button>
+            <button type="button" class="btn-step-nav primary" id="cmFindMatchesBtn">Find My Top Picks ✨</button>
+          </div>
+        </div>
+
+        <!-- Step 5: Matches Result -->
+        <div class="cinematch-step" id="cmStepResult">
+          <div class="step-header">
+            <h3>Your Tailored CineMatch Recommendations</h3>
+            <p id="cmResultSubtitle">Scored algorithmically against your time and mood preferences</p>
+          </div>
+          <div class="cinematch-results-grid" id="cmResultsContainer">
+            <!-- 3 Best matches -->
+          </div>
+          <div class="step-nav-row" style="margin-top: 20px;">
+            <button type="button" class="btn-step-nav" id="cmRestartBtn">&#x21bb; Start Over</button>
+            <button type="button" class="btn-step-nav primary" id="cmDoneBtn">Close</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. SIDE-BY-SIDE MOVIE VS COMPARATOR DRAWER -->
+  <div class="comparator-drawer" id="comparatorDrawer">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <i data-lucide="columns" style="color: var(--accent-brand);"></i>
+        <h3>Movie VS Comparator (Side-by-Side)</h3>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button type="button" class="btn-modal-action" id="clearCompareBtn" style="color: var(--text-primary); border-color: var(--border-subtle);">
+          <i data-lucide="trash-2"></i>
+          <span>Clear</span>
+        </button>
+        <button type="button" class="modal-close-btn" id="closeComparatorBtn" style="position: static;" aria-label="Close drawer">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="drawer-body">
+      <div id="compareEmptyPrompt" style="display: none; text-align: center; padding: 40px 0;">
+        <p style="color: var(--text-muted); font-size: 1rem; margin-bottom: 12px;">Pin 2 movies from cards or detail views to compare their ratings, box office gross, awards, and genre DNA side-by-side.</p>
+        <button type="button" class="btn-load-more" id="compareBrowseBtn" style="margin: 0 auto;">Browse Movies</button>
+      </div>
+
+      <div class="vs-comparison-grid" id="vsComparisonGrid">
+        <!-- Movie 1 Card -->
+        <div class="vs-movie-card" id="vsMovieCard1">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- VS Divider Badge -->
+        <div class="vs-divider">
+          <div class="vs-badge-circle">VS</div>
+        </div>
+
+        <!-- Movie 2 Card -->
+        <div class="vs-movie-card" id="vsMovieCard2">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. USER AUTHENTICATION MODAL (FIREBASE USERNAME + PASSWORD) -->
+  <div class="modal-overlay" id="authModal" role="dialog" aria-modal="true">
+    <div class="modal-container auth-modal-card">
+      <button type="button" class="modal-close-btn" id="closeAuthModalBtn" aria-label="Close Auth Dialog">
+        <i data-lucide="x"></i>
+      </button>
+
+      <!-- Brand Header -->
+      <div class="auth-card-header">
+        <div class="auth-icon-badge">
+          <i data-lucide="clapperboard"></i>
+        </div>
+        <h2 class="auth-modal-title" id="authModalTitle">Welcome to HEARTZZY</h2>
+        <p class="auth-modal-subtitle" id="authModalSubtitle">
+          Sign in to sync your personal watchlist, movie ratings, and custom movie comparisons across all devices.
+        </p>
+      </div>
+
+      <!-- Quick 1-Click Demo Logins -->
+      <div class="demo-accounts-box">
+        <div class="demo-box-top">
+          <span class="demo-chip-label">
+            <i data-lucide="zap" style="width: 13px; height: 13px;"></i>
+            Quick 1-Click Test Logins
+          </span>
+          <span class="demo-chip-sub">Click a role to autofill & test:</span>
+        </div>
+        <div class="demo-buttons-row">
+          <button type="button" class="btn-demo-pill" data-demo="admin" title="Admin with full dashboard access">
+            <span class="pill-role-badge admin"><i data-lucide="shield"></i> Admin</span>
+            <span class="pill-creds">admin / admin123</span>
+          </button>
+          <button type="button" class="btn-demo-pill" data-demo="user" title="Member with watchlist sync">
+            <span class="pill-role-badge user"><i data-lucide="user"></i> Member</span>
+            <span class="pill-creds">cinephile / movie123</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Segmented Tab Switcher -->
+      <div class="auth-segmented-bar">
+        <button type="button" class="auth-segment-btn active" id="authTabLogin">
+          <i data-lucide="log-in"></i>
+          <span>Sign In</span>
+        </button>
+        <button type="button" class="auth-segment-btn" id="authTabRegister">
+          <i data-lucide="user-plus"></i>
+          <span>Create Account</span>
+        </button>
+      </div>
+
+      <!-- Sign In Form -->
+      <form id="loginForm" class="auth-form-animated">
+        <div class="form-input-group">
+          <label class="form-label" for="loginUsernameInput">Username or Email</label>
+          <div class="input-with-icon">
+            <i data-lucide="user" class="input-leading-icon"></i>
+            <input 
+              type="text" 
+              id="loginUsernameInput" 
+              class="form-input has-icon" 
+              placeholder="e.g. admin or cinephile" 
+              required 
+              autocomplete="username"
+            >
+          </div>
+        </div>
+
+        <div class="form-input-group">
+          <div class="label-with-link">
+            <label class="form-label" for="loginPasswordInput">Password</label>
+            <button type="button" class="btn-forgot-pass" id="btnForgotPass">Forgot?</button>
+          </div>
+          <div class="input-with-icon">
+            <i data-lucide="lock" class="input-leading-icon"></i>
+            <input 
+              type="password" 
+              id="loginPasswordInput" 
+              class="form-input has-icon has-trailing" 
+              placeholder="••••••••" 
+              required 
+              autocomplete="current-password"
+            >
+            <button type="button" class="btn-input-trailing" id="loginPassToggle" aria-label="Toggle password visibility">
+              <i data-lucide="eye" id="loginPassIcon"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-checkbox-row">
+          <label class="custom-checkbox">
+            <input type="checkbox" id="loginRememberMe" checked>
+            <span class="checkbox-box"><i data-lucide="check"></i></span>
+            <span>Remember this device</span>
+          </label>
+        </div>
+
+        <div id="loginErrorMsg" class="auth-error-alert" style="display: none;"></div>
+
+        <button type="submit" class="btn-auth-primary" id="loginSubmitBtn">
+          <span class="btn-auth-spinner" id="loginSpinner" style="display: none;"></span>
+          <span id="loginSubmitText">Sign In to Heartzy</span>
+          <i data-lucide="arrow-right" class="btn-auth-arrow" id="loginArrowIcon"></i>
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="registerForm" class="auth-form-animated" style="display: none;">
+        <div class="form-input-group">
+          <label class="form-label" for="regUsernameInput">Choose Username</label>
+          <div class="input-with-icon">
+            <i data-lucide="user" class="input-leading-icon"></i>
+            <input 
+              type="text" 
+              id="regUsernameInput" 
+              class="form-input has-icon" 
+              placeholder="e.g. movie_explorer" 
+              required 
+              minlength="3"
+            >
+          </div>
+        </div>
+
+        <div class="form-input-group">
+          <label class="form-label" for="regEmailInput">Email Address (Optional)</label>
+          <div class="input-with-icon">
+            <i data-lucide="mail" class="input-leading-icon"></i>
+            <input 
+              type="email" 
+              id="regEmailInput" 
+              class="form-input has-icon" 
+              placeholder="you@example.com"
+            >
+          </div>
+        </div>
+
+        <div class="form-input-group">
+          <label class="form-label" for="regPasswordInput">Create Password</label>
+          <div class="input-with-icon">
+            <i data-lucide="lock" class="input-leading-icon"></i>
+            <input 
+              type="password" 
+              id="regPasswordInput" 
+              class="form-input has-icon has-trailing" 
+              placeholder="At least 6 characters" 
+              required 
+              minlength="6"
+            >
+            <button type="button" class="btn-input-trailing" id="regPassToggle" aria-label="Toggle password visibility">
+              <i data-lucide="eye" id="regPassIcon"></i>
+            </button>
+          </div>
+
+          <!-- Live Password Strength Meter -->
+          <div class="pass-strength-wrapper" id="passStrengthWrapper" style="display: none;">
+            <div class="strength-track">
+              <div class="strength-fill" id="passStrengthBar"></div>
+            </div>
+            <div class="strength-text-row">
+              <span class="strength-label">Password strength:</span>
+              <span class="strength-val" id="passStrengthVal">Too weak</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="registerErrorMsg" class="auth-error-alert" style="display: none;"></div>
+
+        <button type="submit" class="btn-auth-primary" id="registerSubmitBtn">
+          <span class="btn-auth-spinner" id="regSpinner" style="display: none;"></span>
+          <span id="regSubmitText">Create Free Account</span>
+          <i data-lucide="arrow-right" class="btn-auth-arrow" id="regArrowIcon"></i>
+        </button>
+      </form>
+
+      <!-- Bottom Auth Switch Link -->
+      <div class="auth-footer-note">
+        <span id="authFooterPrompt">Don't have an account yet?</span>
+        <button type="button" class="btn-switch-auth" id="btnSwitchAuthTab">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. TOAST NOTIFICATIONS CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
